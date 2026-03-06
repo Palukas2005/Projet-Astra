@@ -7,36 +7,38 @@ from core.reasoning import Reasoning
 from core.communication import Communication
 from core.evolution import Evolution
 from core.brain import Brain
+from core.autonomy.initiative import Initiative
 from utils.logger import Logger
 
-# 🔹 Chargement de la configuration
+# 🔹 Chargement config
 with open("data/config.json", encoding="utf-8") as f:
     config = json.load(f)
 
-# 🔹 Initialisation des modules
-emotions = EmotionEngine(config.get("emotions", {}))
-personality = Personality(config.get("traits", {}))
+# 🔹 Initialisation modules
+emotions = EmotionEngine(config["emotions"])
+personality = Personality(config["traits"])
 memory = Memory()
 reasoning = Reasoning(emotions, personality, memory)
-communication = Communication(model_name="stabilityai/stablelm-tuned-alpha-7b")
+communication = Communication(model_name="microsoft/phi-2")
 evolution = Evolution(personality, emotions)
-logger = Logger("astra_log.txt")  # Fichier de log
-
-# 🔹 Création du "cerveau" Astra
-astra_brain = Brain(personality, emotions, memory, reasoning, communication, evolution, logger)
+logger = Logger()
+brain = Brain(personality, emotions, memory, reasoning, communication, evolution, logger)
+autonomy = Initiative(brain)
 
 print("Astra est prête. Tapez 'exit' pour quitter.")
 
-# 🔹 Boucle principale d'interaction
+# 🔹 Boucle d’interaction
 while True:
+    # 1️⃣ Vérifier initiative autonome
+    autonomous_response = autonomy.try_action()
+    if autonomous_response:
+        print("Astra (spontanée) :", autonomous_response)
+
+    # 2️⃣ Interaction classique
     user_message = input("Vous : ")
     if user_message.lower() in ["exit", "quit"]:
-        print("Astra : À bientôt ! 👋")
         break
 
-    # 🔹 Traitement du message par Astra
-    response = astra_brain.process_message(user_message)
-
-    # 🔹 Affichage de la réponse et des traits actuels
-    print(f"Astra : {response}")
-    print(f"Traits actuels : {personality.traits}")
+    response = brain.process_message(user_message)
+    print("Astra :", response)
+    print("Traits actuels :", personality.traits)

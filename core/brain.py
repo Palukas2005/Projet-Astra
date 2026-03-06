@@ -15,12 +15,13 @@ class Brain:
     def process_message(self, user_message: str):
         """
         Traite un message utilisateur : décide, génère réponse, applique style et log.
+        Optimisé pour Colab.
         """
 
         # 1️⃣ Mise à jour émotionnelle simple
         self.emotions.update_emotion({"joie": {"amusement": 5}})
 
-        # 2️⃣ Récupération des souvenirs récents
+        # 2️⃣ Récupération des souvenirs récents et limitation pour rapidité
         recent_memories = self.memory.get_memories()
         memory_context = self._shorten_memory("\n".join([m[0] for m in recent_memories]))
 
@@ -33,7 +34,7 @@ class Brain:
         # 5️⃣ Déterminer style et ton
         style_instruction = self.choose_style(user_message)
 
-        # 6️⃣ Génération réponse
+        # 6️⃣ Génération réponse via communication
         response = self.communication.generate_response(
             user_message,
             self.personality.traits,
