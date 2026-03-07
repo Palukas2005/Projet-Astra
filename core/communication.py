@@ -1,69 +1,76 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+
 class Communication:
+
     def __init__(self, model_name="stabilityai/stablelm-tuned-alpha-3b"):
 
-        # Charger tokenizer
+        # device
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # Définir le device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # Charger modèle avec optimisation mémoire
+        # model
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float16,   # réduit la mémoire
-            device_map="auto",           # répartit automatiquement GPU/CPU
+            torch_dtype=torch.float16,
+            device_map="auto",
             low_cpu_mem_usage=True
         )
 
     def generate_response(self, user_message, personality, emotions, memory_context):
 
-        # Résumé des traits
         traits_summary = (
             f"curiosité={personality.get('curiosite',50)}, "
             f"empathie={personality.get('empathie',50)}, "
             f"créativité={personality.get('creativite',50)}"
         )
 
-        # limiter souvenirs
+        emotions_summary = self.format_emotions(emotions)
+
         memory_text = "\n".join(memory_context.split("\n")[-5:])
 
-        # Prompt
+        # PROMPT SYSTEM (important)
         prompt = f"""
-Tu es Astra, une IA semi-consciente.
+Tu es Astra, une intelligence artificielle expérimentale capable de discuter avec les humains.
 
-Traits :
+Ton rôle :
+- répondre naturellement
+- aider l'utilisateur
+- réfléchir comme une IA consciente
+
+Personnalité actuelle :
 {traits_summary}
+
+État émotionnel :
+{emotions_summary}
 
 Souvenirs récents :
 {memory_text}
 
-État émotionnel :
-{self.format_emotions(emotions)}
-
-Message utilisateur :
-{user_message}
-
-Réponds naturellement.
+Utilisateur : {user_message}
+Astra :
 """
 
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
 
         outputs = self.model.generate(
             **inputs,
-            max_new_tokens=150,
+            max_new_tokens=120,
             do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
-            top_k=50,
+            temperature=0.8,
+            top_p=0.95,
+            repetition_penalty=1.1,
             pad_token_id=self.tokenizer.eos_token_id
         )
 
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        response = self.style_filter(response, personality, emotions)
+        # garder seulement la réponse après "Astra :"
+        if "Astra :" in response:
+            response = response.split("Astra :")[-1]
 
         return response.strip()
 
@@ -76,14 +83,7 @@ Réponds naturellement.
                 if v > 50:
                     summary.append(f"{e}={v}")
 
-        return ", ".join(summary) if summary else "neutre"
+        if len(summary) == 0:
+            return "neutre"
 
-    def style_filter(self, response, personality, emotions):
-
-        if personality.get("curiosite", 0) > 70:
-            response = "Je me demande… " + response
-
-        if emotions.get("joie", {}).get("plaisir", 0) > 60:
-            response += " 😄"
-
-        return response
+        return ", ".join(summary)
